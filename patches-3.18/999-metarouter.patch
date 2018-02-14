@@ -1,0 +1,1273 @@
+Index: linux-3.18.43/arch/mips/include/asm/io.h
+===================================================================
+--- linux-3.18.43.orig/arch/mips/include/asm/io.h
++++ linux-3.18.43/arch/mips/include/asm/io.h
+@@ -206,6 +206,7 @@ static inline void __iomem * __ioremap_m
+ 		if (!size || last_addr < phys_addr)
+ 			return NULL;
+ 
++#ifndef CONFIG_MAPPED_KERNEL
+ 		/*
+ 		 * Map uncached objects in the low 512MB of address
+ 		 * space using KSEG1.
+@@ -214,6 +215,7 @@ static inline void __iomem * __ioremap_m
+ 		    flags == _CACHE_UNCACHED)
+ 			return (void __iomem *)
+ 				(unsigned long)CKSEG1ADDR(phys_addr);
++#endif
+ 	}
+ 
+ 	return __ioremap(offset, size, flags);
+Index: linux-3.18.43/arch/mips/include/asm/mach-rb/cpu-feature-overrides.h
+===================================================================
+--- /dev/null
++++ linux-3.18.43/arch/mips/include/asm/mach-rb/cpu-feature-overrides.h
+@@ -0,0 +1,6 @@
++#ifndef __ASM_MACH_RB_CPU_FEATURE_OVERRIDES_H
++#define __ASM_MACH_RB_CPU_FEATURE_OVERRIDES_H
++
++#define cpu_has_dsp		0
++
++#endif /* __ASM_MACH_RB_CPU_FEATURE_OVERRIDES_H */
+Index: linux-3.18.43/arch/mips/include/asm/mach-rb/irq.h
+===================================================================
+--- /dev/null
++++ linux-3.18.43/arch/mips/include/asm/mach-rb/irq.h
+@@ -0,0 +1,16 @@
++/*
++ * This file is subject to the terms and conditions of the GNU General Public
++ * License.  See the file "COPYING" in the main directory of this archive
++ * for more details.
++ *
++ * Copyright (C) 2003 by Ralf Baechle
++ */
++#ifndef __ASM_MACH_RB_IRQ_H
++#define __ASM_MACH_RBC_IRQ_H
++
++#define I8259A_IRQ_BASE 0
++#define MIPS_CPU_IRQ_BASE 0
++
++#define NR_IRQS	168
++
++#endif /* __ASM_MACH_RB_IRQ_H */
+Index: linux-3.18.43/arch/mips/include/asm/mach-rb/kernel-entry-init.h
+===================================================================
+--- /dev/null
++++ linux-3.18.43/arch/mips/include/asm/mach-rb/kernel-entry-init.h
+@@ -0,0 +1,44 @@
++#ifndef __ASM_MACH_RB_KERNEL_ENTRY_H
++#define __ASM_MACH_RB_KERNEL_ENTRY_H
++
++.macro	kernel_entry_setup
++#ifdef CONFIG_MAPPED_KERNEL
++	.set	push
++	.set	mips32r2
++	/* check whether we are running under 0xc0000000 address space */
++	lui	t0, 0xf000
++	bal	1f
++1:	and	t1, ra, t0
++	li	t0, 0xc0000000
++	beq	t0, t1, 2f
++	/* set up 0xc0000000 address space */
++	mtc0	t0, CP0_ENTRYHI
++	li	t0, 0x1f
++	mtc0	t0, CP0_ENTRYLO0
++	li	t0, 0x0010001f
++	mtc0	t0, CP0_ENTRYLO1
++	li	t0, PM_64M
++	mtc0	t0, CP0_PAGEMASK
++	li	t0, 0
++	mtc0	t0, CP0_INDEX
++	li	t0, 2
++	mtc0	t0, CP0_WIRED
++	ehb
++	tlbwi
++
++	li	t0, 0xc8000000
++	mtc0	t0, CP0_ENTRYHI
++	li	t0, 0x0020001f
++	mtc0	t0, CP0_ENTRYLO0
++	li	t0, 0x0030001f
++	mtc0	t0, CP0_ENTRYLO1
++	li	t0, 1
++	mtc0	t0, CP0_INDEX
++	ehb
++	tlbwi
++2:
++	.set	pop
++#endif
++.endm
++
++#endif
+Index: linux-3.18.43/arch/mips/include/asm/mach-rb/kmalloc.h
+===================================================================
+--- /dev/null
++++ linux-3.18.43/arch/mips/include/asm/mach-rb/kmalloc.h
+@@ -0,0 +1,4 @@
++#ifndef __ASM_MACH_RB_KMALLOC_H
++#define __ASM_MACH_RB_KMALLOC_H
++
++#endif
+Index: linux-3.18.43/arch/mips/include/asm/mach-rb/mangle-port.h
+===================================================================
+--- /dev/null
++++ linux-3.18.43/arch/mips/include/asm/mach-rb/mangle-port.h
+@@ -0,0 +1,36 @@
++/*
++ * This file is subject to the terms and conditions of the GNU General Public
++ * License.  See the file "COPYING" in the main directory of this archive
++ * for more details.
++ *
++ * Copyright (C) 2003, 2004 Ralf Baechle
++ */
++#ifndef __ASM_MACH_GENERIC_MANGLE_PORT_H
++#define __ASM_MACH_GENERIC_MANGLE_PORT_H
++
++#ifdef CONFIG_CPU_LITTLE_ENDIAN
++
++#define __swizzle_addr_b(port)	(port)
++#define __swizzle_addr_w(port)	(port)
++#define __swizzle_addr_l(port)	(port)
++#define __swizzle_addr_q(port)	(port)
++
++#else
++
++#define __swizzle_addr_b(port)  ((port) ^ 3)
++#define __swizzle_addr_w(port)  ((port) ^ 2)
++#define __swizzle_addr_l(port)  (port)
++#define __swizzle_addr_q(port)  (port)
++
++#endif
++
++#define ioswabb(a,x)		(x)
++#define __mem_ioswabb(a,x)	(x)
++#define ioswabw(a,x)		(x)
++#define __mem_ioswabw(a,x)	cpu_to_le16(x)
++#define ioswabl(a,x)		(x)
++#define __mem_ioswabl(a,x)	cpu_to_le32(x)
++#define ioswabq(a,x)		(x)
++#define __mem_ioswabq(a,x)	cpu_to_le32(x)
++
++#endif /* __ASM_MACH_GENERIC_MANGLE_PORT_H */
+Index: linux-3.18.43/arch/mips/include/asm/mach-rb/spaces.h
+===================================================================
+--- /dev/null
++++ linux-3.18.43/arch/mips/include/asm/mach-rb/spaces.h
+@@ -0,0 +1,30 @@
++#ifndef _ASM_MACH_RB_SPACES_H
++#define _ASM_MACH_RB_SPACES_H
++
++#include <linux/const.h>
++
++#define PHYS_OFFSET		_AC(0, UL)
++
++#ifdef CONFIG_MAPPED_KERNEL
++#define CAC_BASE		_AC(0xc0000000, UL)
++#else
++#define CAC_BASE		_AC(0x80000000, UL)
++#endif
++#define IO_BASE			_AC(0xa0000000, UL)
++#define UNCAC_BASE		_AC(0xa0000000, UL)
++
++#ifndef MAP_BASE
++#define MAP_BASE		_AC(0xd0000000, UL)
++#endif
++
++#define HIGHMEM_START		_AC(0x20000000, UL)
++
++#define PAGE_OFFSET		(CAC_BASE + PHYS_OFFSET)
++
++#ifndef CONFIG_MAPPED_KERNEL
++#define FIXADDR_TOP		((unsigned long)(long)(int)0xfffe0000)
++#else
++#define FIXADDR_TOP		((unsigned long)(long)(int)0xdffe0000)
++#endif
++
++#endif
+Index: linux-3.18.43/arch/mips/include/asm/mach-rb/war.h
+===================================================================
+--- /dev/null
++++ linux-3.18.43/arch/mips/include/asm/mach-rb/war.h
+@@ -0,0 +1,18 @@
++#ifndef __ASM_MIPS_MACH_RB_WAR_H
++#define __ASM_MIPS_MACH_RB_WAR_H
++
++#define R4600_V1_INDEX_ICACHEOP_WAR	0
++#define R4600_V1_HIT_CACHEOP_WAR	0
++#define R4600_V2_HIT_CACHEOP_WAR	0
++#define R5432_CP0_INTERRUPT_WAR		0
++#define BCM1250_M3_WAR			0
++#define SIBYTE_1956_WAR			0
++#define MIPS4K_ICACHE_REFILL_WAR	0
++#define MIPS_CACHE_SYNC_WAR		0
++#define TX49XX_ICACHE_INDEX_INV_WAR	0
++#define RM9000_CDEX_SMP_WAR		0
++#define ICACHE_REFILLS_WORKAROUND_WAR   0
++#define R10000_LLSC_WAR			0
++#define MIPS34K_MISSED_ITLB_WAR		0
++
++#endif
+Index: linux-3.18.43/arch/mips/include/asm/rb/boards.h
+===================================================================
+--- /dev/null
++++ linux-3.18.43/arch/mips/include/asm/rb/boards.h
+@@ -0,0 +1,66 @@
++#ifndef _ASM_RB_BOARDS_H
++#define _ASM_RB_BOARDS_H
++
++#define MACH_GROUP_MT_RB500    1	/* Mikrotik RB500 */
++#define MACH_GROUP_MT_RB100    2	/* Mikrotik RB100 */
++#define MACH_GROUP_MT_CR       3	/* Mikrotik CR */
++#define MACH_GROUP_MT_RB400    4
++#define MACH_GROUP_MT_VM       6
++#define MACH_GROUP_MT_RB700    7
++
++
++#define  MACH_MT_RB500		0
++#define  MACH_MT_RB500R5	1
++#define  MACH_MT_RB100		2
++#define  MACH_MT_RB150		3
++#define  MACH_MT_RB133		4
++#define  MACH_MT_RB133C		5
++#define  MACH_MT_MR		6
++#define  MACH_MT_RB192		7
++#define  MACH_MT_CR1		8
++#define  MACH_MT_RB411		10
++#define  MACH_MT_RB433		11
++#define  MACH_MT_RB433U		12	/* RB433 + USB */
++#define  MACH_MT_RB450		13
++#define  MACH_MT_RB493		15
++#define  MACH_MT_RB450G		16
++#define  MACH_MT_RB411U		17
++#define  MACH_MT_RB493G		18
++#define  MACH_MT_RB750G		19
++#define  MACH_MT_RB435G		20
++#define  MACH_MT_RB750		23
++#define  MACH_MT_RB711		24
++#define  MACH_MT_RB_OMNI	25
++#define  MACH_MT_RB_SXT5D	26
++#define  MACH_MT_RB_GROOVE	27
++#define  MACH_MT_RB_OMNI_5FE	28	/* OmniTIK U-5HnD */
++#define  MACH_MT_RB711R3	29
++#define  MACH_MT_RB751G		30
++#define  MACH_MT_RB711G		31
++#define  MACH_MT_RB411L		33
++#define  MACH_MT_RB750GL	35
++#define  MACH_MT_RB411G		36
++#define  MACH_MT_RB951		37
++#define  MACH_MT_GROOVE52	38
++#define  MACH_MT_RB2011G	39
++#define  MACH_MT_RB912G		40
++#define  MACH_MT_RB433GL	41
++#define  MACH_MT_RB433UL	42
++#define  MACH_MT_RB_SXTG	43
++#define  MACH_MT_RB751		44
++#define  MACH_MT_RB_GROOVE_5S	45
++#define  MACH_MT_RB433L		46
++#define  MACH_MT_RB411UL	47
++#define  MACH_MT_RB2011L	49
++#define  MACH_MT_RB2011LS	50
++#define  MACH_MT_RB951G		52
++#define  MACH_MT_RB2011US	53
++#define  MACH_MT_SXT2D		58
++#define  MACH_MT_SXT5N		59
++#define  MACH_MT_RB2011R5	61
++#define  MACH_MT_CRS125G	63
++
++extern unsigned long mips_machgroup;
++extern unsigned long mips_machtype;
++
++#endif
+Index: linux-3.18.43/arch/mips/include/asm/rb/booter.h
+===================================================================
+--- /dev/null
++++ linux-3.18.43/arch/mips/include/asm/rb/booter.h
+@@ -0,0 +1,19 @@
++#ifndef _ASM_BOOTER_H
++#define _ASM_BOOTER_H
++
++#define ID_HW_OPTIONS		0x00000015
++
++#define HW_OPT_UART_ABSENT	(1 << 0)
++#define HW_OPT_HAS_VOLTAGE	(1 << 1)
++#define HW_OPT_HAS_USB		(1 << 2)
++#define HW_OPT_HAS_ATTINY	(1 << 3)
++#define HW_OPT_NO_NAND		(1 << 14)
++#define HW_OPT_HAS_LCD		(1 << 15)
++#define HW_OPT_HAS_POE_OUT	(1 << 16)
++#define HW_OPT_HAS_uSD		(1 << 17)
++#define HW_OPT_HAS_SFP		(1 << 20)
++#define HW_OPT_HAS_WIFI		(1 << 21)
++
++int read_booter_cfg(unsigned id, void *buf, int amount);
++
++#endif
+Index: linux-3.18.43/arch/mips/include/asm/string.h
+===================================================================
+--- linux-3.18.43.orig/arch/mips/include/asm/string.h
++++ linux-3.18.43/arch/mips/include/asm/string.h
+@@ -108,8 +108,9 @@ strncmp(__const__ char *__cs, __const__
+ 	__asm__ __volatile__(
+ 	".set\tnoreorder\n\t"
+ 	".set\tnoat\n"
+-	"1:\tlbu\t%3,(%0)\n\t"
+-	"beqz\t%2,2f\n\t"
++	"1:\tbeqz\t%2,2f\n\t"
++	"nop\n\t"
++	"lbu\t%3,(%0)\n\t"
+ 	"lbu\t$1,(%1)\n\t"
+ 	"subu\t%2,1\n\t"
+ 	"bne\t$1,%3,3f\n\t"
+Index: linux-3.18.43/arch/mips/include/asm/vm.h
+===================================================================
+--- /dev/null
++++ linux-3.18.43/arch/mips/include/asm/vm.h
+@@ -0,0 +1,43 @@
++#ifndef MT_VM_H
++#define MT_VM_H
++
++#define VIRQ_BASE	64
++
++#define hypercall(name, nr, ...)		\
++	asm(					\
++		".global " #name ";"		\
++		".align 2;"			\
++		".set	push;"			\
++		".set	noreorder;"		\
++		".type " #name ",@function;"	\
++		".ent " #name ",0;"		\
++		#name ": .frame $sp,0,$ra;"	\
++		"li $3, " #nr ";"		\
++		"li $2, -22;"			\
++		"mtc0 $0, $1;"			\
++		"jr $ra;"			\
++		"nop;"				\
++		".end " #name ";"		\
++		".size " #name ",.-" #name ";"	\
++		".set	pop"			\
++        );					\
++	asmlinkage extern int name(__VA_ARGS__);
++
++/* NOTE: do not allow vdma_descr to span multiple pages, so align it */
++struct vdma_descr {
++	unsigned addr;
++	unsigned size;
++	unsigned next;
++} __attribute__((aligned(16)));
++
++#define DONE		0x80000000
++
++static inline unsigned get_virq_nr(unsigned hwirq)
++{
++	return VIRQ_BASE + hwirq;
++}
++
++extern int vm_running(void);
++#define hc_yield() asm volatile ("wait")
++
++#endif
+Index: linux-3.18.43/arch/mips/Kbuild.platforms
+===================================================================
+--- linux-3.18.43.orig/arch/mips/Kbuild.platforms
++++ linux-3.18.43/arch/mips/Kbuild.platforms
+@@ -30,6 +30,7 @@ platforms += sibyte
+ platforms += sni
+ platforms += txx9
+ platforms += vr41xx
++platforms += rb
+ 
+ # include the platform specific files
+ include $(patsubst %, $(srctree)/arch/mips/%/Platform, $(platforms))
+Index: linux-3.18.43/arch/mips/Kconfig
+===================================================================
+--- linux-3.18.43.orig/arch/mips/Kconfig
++++ linux-3.18.43/arch/mips/Kconfig
+@@ -723,6 +723,21 @@ config MIKROTIK_RB532
+ 	  Support the Mikrotik(tm) RouterBoard 532 series,
+ 	  based on the IDT RC32434 SoC.
+ 
++config MIPS_MIKROTIK
++	bool "Support for Mikrotik RB boards"
++	select CEVT_R4K
++	select CSRC_R4K
++	select DMA_NONCOHERENT
++	select IRQ_CPU
++	select SYS_HAS_CPU_MIPS32_R1
++	select SYS_HAS_CPU_MIPS32_R2
++	select SYS_SUPPORTS_LITTLE_ENDIAN
++	select SYS_SUPPORTS_BIG_ENDIAN
++	select SYS_SUPPORTS_32BIT_KERNEL
++	select ZONE_DMA
++	help
++	  Say Y here to support all Mikrotik mips based routerboards
++
+ config CAVIUM_OCTEON_SOC
+ 	bool "Cavium Networks Octeon SoC based boards"
+ 	select CEVT_R4K
+@@ -834,6 +851,10 @@ config MIPS_PARAVIRT
+ 
+ endchoice
+ 
++config MAPPED_KERNEL
++	bool "Mapped kernel support"
++	depends on MIPS_MIKROTIK
++
+ source "arch/mips/alchemy/Kconfig"
+ source "arch/mips/ath79/Kconfig"
+ source "arch/mips/bcm47xx/Kconfig"
+@@ -1162,6 +1187,7 @@ config MIPS_L1_CACHE_SHIFT
+ 	default "5" if MIPS_L1_CACHE_SHIFT_5
+ 	default "6" if MIPS_L1_CACHE_SHIFT_6
+ 	default "7" if MIPS_L1_CACHE_SHIFT_7
++	default "4" if MIPS_MIKROTIK
+ 	default "5"
+ 
+ config HAVE_STD_PC_SERIAL_PORT
+@@ -1240,7 +1266,7 @@ config CPU_LOONGSON1B
+ config CPU_MIPS32_R1
+ 	bool "MIPS32 Release 1"
+ 	depends on SYS_HAS_CPU_MIPS32_R1
+-	select CPU_HAS_PREFETCH
++#	select CPU_HAS_PREFETCH
+ 	select CPU_SUPPORTS_32BIT_KERNEL
+ 	select CPU_SUPPORTS_HIGHMEM
+ 	help
+@@ -1257,7 +1283,7 @@ config CPU_MIPS32_R1
+ config CPU_MIPS32_R2
+ 	bool "MIPS32 Release 2"
+ 	depends on SYS_HAS_CPU_MIPS32_R2
+-	select CPU_HAS_PREFETCH
++#	select CPU_HAS_PREFETCH
+ 	select CPU_SUPPORTS_32BIT_KERNEL
+ 	select CPU_SUPPORTS_HIGHMEM
+ 	select CPU_SUPPORTS_MSA
+Index: linux-3.18.43/arch/mips/kernel/cevt-r4k.c
+===================================================================
+--- linux-3.18.43.orig/arch/mips/kernel/cevt-r4k.c
++++ linux-3.18.43/arch/mips/kernel/cevt-r4k.c
+@@ -11,6 +11,7 @@
+ #include <linux/percpu.h>
+ #include <linux/smp.h>
+ #include <linux/irq.h>
++#include <linux/kernel.h>
+ 
+ #include <asm/time.h>
+ #include <asm/cevt-r4k.h>
+@@ -97,6 +98,14 @@ static int c0_compare_int_pending(void)
+  * so wait up to worst case number of cycle counter ticks for timer interrupt
+  * changes to propagate to the cause register.
+  */
++#define back_to_back_c0_hazard4() \
++	do { \
++		back_to_back_c0_hazard(); \
++		back_to_back_c0_hazard(); \
++		back_to_back_c0_hazard(); \
++		back_to_back_c0_hazard(); \
++	} while (0)
++
+ #define COMPARE_INT_SEEN_TICKS 50
+ 
+ int c0_compare_int_usable(void)
+@@ -108,13 +117,15 @@ int c0_compare_int_usable(void)
+     return 1;
+ #endif
+ 
++	printk(KERN_WARNING "Anyway, a printk works...\n");
++
+ 	/*
+ 	 * IP7 already pending?	 Try to clear it by acking the timer.
+ 	 */
+ 	if (c0_compare_int_pending()) {
+ 		cnt = read_c0_count();
+ 		write_c0_compare(cnt);
+-		back_to_back_c0_hazard();
++		back_to_back_c0_hazard4();
+ 		while (read_c0_count() < (cnt  + COMPARE_INT_SEEN_TICKS))
+ 			if (!c0_compare_int_pending())
+ 				break;
+@@ -126,7 +137,7 @@ int c0_compare_int_usable(void)
+ 		cnt = read_c0_count();
+ 		cnt += delta;
+ 		write_c0_compare(cnt);
+-		back_to_back_c0_hazard();
++		back_to_back_c0_hazard4();
+ 		if ((int)(read_c0_count() - cnt) < 0)
+ 		    break;
+ 		/* increase delta if the timer was already expired */
+@@ -142,7 +153,7 @@ int c0_compare_int_usable(void)
+ 		return 0;
+ 	cnt = read_c0_count();
+ 	write_c0_compare(cnt);
+-	back_to_back_c0_hazard();
++	back_to_back_c0_hazard4();
+ 	while (read_c0_count() < (cnt + COMPARE_INT_SEEN_TICKS))
+ 		if (!c0_compare_int_pending())
+ 			break;
+Index: linux-3.18.43/arch/mips/kernel/head.S
+===================================================================
+--- linux-3.18.43.orig/arch/mips/kernel/head.S
++++ linux-3.18.43/arch/mips/kernel/head.S
+@@ -86,7 +86,7 @@ EXPORT(__image_cmdline)
+ 	.fill	0x400
+ #endif /* CONFIG_IMAGE_CMDLINE_HACK */
+ 
+-	__REF
++	__HEAD
+ 
+ NESTED(kernel_entry, 16, sp)			# kernel entry point
+ 
+Index: linux-3.18.43/arch/mips/kernel/module.c
+===================================================================
+--- linux-3.18.43.orig/arch/mips/kernel/module.c
++++ linux-3.18.43/arch/mips/kernel/module.c
+@@ -30,6 +30,7 @@
+ #include <linux/string.h>
+ #include <linux/kernel.h>
+ #include <linux/spinlock.h>
++#include <linux/mm.h>
+ #include <linux/jump_label.h>
+ 
+ #include <asm/pgtable.h>	/* MODULE_START */
+@@ -183,7 +184,10 @@ static inline bool is_phys_addr(void *pt
+ #ifdef CONFIG_64BIT
+ 	return (KSEGX((unsigned long)ptr) == CKSEG0);
+ #else
+-	return (KSEGX(ptr) == KSEG0);
++	unsigned addr = (unsigned) ptr;
++	return addr && (addr < VMALLOC_START || addr > VMALLOC_END);
++//	return (KSEGX(ptr) == KSEG0);
++
+ #endif
+ }
+ 
+Index: linux-3.18.43/arch/mips/kernel/unaligned.c
+===================================================================
+--- linux-3.18.43.orig/arch/mips/kernel/unaligned.c
++++ linux-3.18.43/arch/mips/kernel/unaligned.c
+@@ -108,6 +108,24 @@ static u32 unaligned_action;
+ #endif
+ extern void show_registers(struct pt_regs *regs);
+ 
++#define RATE_BURST (10*5*HZ)
++#define RATE_COST (5*HZ)
++
++static int un_ratelimit(void) {
++	static unsigned toks = RATE_BURST;
++	static unsigned last_msg;
++
++	unsigned now = jiffies;
++	toks += now - last_msg;
++	if (toks > RATE_BURST) toks = RATE_BURST;
++
++	if (toks >= RATE_COST) {
++		toks -= RATE_COST;
++		return 1;
++	}
++	return 0;
++}
++
+ #ifdef __BIG_ENDIAN
+ #define     LoadHW(addr, value, res)  \
+ 		__asm__ __volatile__ (".set\tnoat\n"        \
+@@ -1635,11 +1653,23 @@ sigill:
+ 	force_sig(SIGILL, current);
+ }
+ 
++extern asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long write,
++				     unsigned long address);
++
+ asmlinkage void do_ade(struct pt_regs *regs)
+ {
+ 	enum ctx_state prev_state;
+-	unsigned int __user *pc;
++	unsigned int __user *pc = NULL;
+ 	mm_segment_t seg;
++	unsigned long badvaddr = regs->cp0_badvaddr;
++
++	/* We are running in VM protected enviroment and
++	   we hit KSEG0, or KSEG3 address */
++	if ((badvaddr & 3) == 0 && KSEGX(badvaddr) == KSEG3) {
++		do_page_fault(regs, (regs->cp0_cause & 0x7c) == 20,
++			      badvaddr);
++		return;
++	}
+ 
+ 	prev_state = exception_enter();
+ 	perf_sw_event(PERF_COUNT_SW_ALIGNMENT_FAULTS,
+@@ -1655,6 +1685,10 @@ asmlinkage void do_ade(struct pt_regs *r
+ 	if (unaligned_action == UNALIGNED_ACTION_SIGNAL)
+ 		goto sigbus;
+ 
++	if (!user_mode(regs) && un_ratelimit())
++		printk(KERN_WARNING "unaligned data access %lx at %p %pS\n",
++			badvaddr, pc, (void *)pc);
++
+ 	/*
+ 	 * Do branch emulation only if we didn't forward the exception.
+ 	 * This is all so but ugly ...
+Index: linux-3.18.43/arch/mips/kernel/vmlinux.lds.S
+===================================================================
+--- linux-3.18.43.orig/arch/mips/kernel/vmlinux.lds.S
++++ linux-3.18.43/arch/mips/kernel/vmlinux.lds.S
+@@ -51,6 +51,7 @@ SECTIONS
+ 	/* read-only */
+ 	_text = .;	/* Text and read-only data */
+ 	.text : {
++	        HEAD_TEXT
+ 		TEXT_TEXT
+ 		SCHED_TEXT
+ 		LOCK_TEXT
+Index: linux-3.18.43/arch/mips/mm/c-r4k.c
+===================================================================
+--- linux-3.18.43.orig/arch/mips/mm/c-r4k.c
++++ linux-3.18.43/arch/mips/mm/c-r4k.c
+@@ -1183,7 +1183,9 @@ static void probe_pcache(void)
+ 			      c->dcache.linesz;
+ 		c->dcache.waybit = __ffs(dcache_size/c->dcache.ways);
+ 
++#ifdef CONFIG_CPU_HAS_PREFETCH
+ 		c->options |= MIPS_CPU_PREFETCH;
++#endif
+ 		break;
+ 	}
+ 
+Index: linux-3.18.43/arch/mips/mm/dma-default.c
+===================================================================
+--- linux-3.18.43.orig/arch/mips/mm/dma-default.c
++++ linux-3.18.43/arch/mips/mm/dma-default.c
+@@ -14,6 +14,10 @@
+ #include <linux/module.h>
+ #include <linux/scatterlist.h>
+ #include <linux/string.h>
++#ifdef CONFIG_MAPPED_KERNEL
++#include <linux/hardirq.h>
++#include <linux/sched.h>
++#endif
+ #include <linux/gfp.h>
+ #include <linux/highmem.h>
+ #include <linux/dma-contiguous.h>
+@@ -53,11 +57,9 @@ static gfp_t massage_gfp_flags(const str
+ 	/* ignore region specifiers */
+ 	gfp &= ~(__GFP_DMA | __GFP_DMA32 | __GFP_HIGHMEM);
+ 
+-#ifdef CONFIG_ISA
+ 	if (dev == NULL)
+ 		dma_flag = __GFP_DMA;
+ 	else
+-#endif
+ #if defined(CONFIG_ZONE_DMA32) && defined(CONFIG_ZONE_DMA)
+ 	     if (dev->coherent_dma_mask < DMA_BIT_MASK(32))
+ 			dma_flag = __GFP_DMA;
+@@ -128,8 +130,15 @@ void *mips_dma_alloc_coherent(struct dev
+ 	*dma_handle = plat_map_dma_mem(dev, ret, size);
+ 	if (!plat_device_is_coherent(dev)) {
+ 		dma_cache_wback_inv((unsigned long) ret, size);
++#ifndef CONFIG_MAPPED_KERNEL
+ 		if (!hw_coherentio)
+ 			ret = UNCAC_ADDR(ret);
++#else
++		if (!in_interrupt())
++			ret = ioremap((unsigned long) *dma_handle, size);
++		else
++			ret = UNCAC_ADDR(ret);
++#endif
+ 	}
+ 
+ 	return ret;
+@@ -156,10 +165,24 @@ void mips_dma_free_coherent(struct devic
+ 	if (dma_release_from_coherent(dev, order, vaddr))
+ 		return;
+ 
++#ifndef CONFIG_MAPPED_KERNEL
+ 	plat_unmap_dma_mem(dev, dma_handle, size, DMA_BIDIRECTIONAL);
+ 
+ 	if (!plat_device_is_coherent(dev) && !hw_coherentio)
+ 		addr = CAC_ADDR(addr);
++#else
++	if (!plat_device_is_coherent(dev)) {
++		pgd_t *pgd = init_mm.pgd + __pgd_offset(addr);
++		pud_t *pud = pud_offset(pgd, addr);
++		pmd_t *pmd = pmd_offset(pud, addr);
++		pte_t *pte = pte_offset(pmd, addr);
++		
++		if (pte_present(*pte)) {
++			addr = (unsigned long) pfn_to_kaddr(pte_pfn(*pte));
++			iounmap(vaddr);
++		}
++	}
++#endif
+ 
+ 	page = virt_to_page((void *) addr);
+ 
+Index: linux-3.18.43/arch/mips/mm/fault.c
+===================================================================
+--- linux-3.18.43.orig/arch/mips/mm/fault.c
++++ linux-3.18.43/arch/mips/mm/fault.c
+@@ -85,6 +85,12 @@ static void __kprobes __do_page_fault(st
+ 		goto VMALLOC_FAULT_TARGET;
+ #endif
+ 
++#ifdef CONFIG_MAPPED_KERNEL
++	/* in case we touched other VM memory */
++	if (KSEGX(address) == KSEG2)
++		goto VMALLOC_FAULT_TARGET;
++#endif
++
+ 	/*
+ 	 * If we're in an interrupt or have no user
+ 	 * context, we must not take the fault..
+Index: linux-3.18.43/arch/mips/mm/init.c
+===================================================================
+--- linux-3.18.43.orig/arch/mips/mm/init.c
++++ linux-3.18.43/arch/mips/mm/init.c
+@@ -44,6 +44,10 @@
+ #include <asm/tlb.h>
+ #include <asm/fixmap.h>
+ 
++#ifdef CONFIG_MIPS_MIKROTIK
++#include <asm/rb/boards.h>
++#endif
++
+ /*
+  * We have up to 8 empty zeroed pages so we can map one of the right colour
+  * when needed.	 This is necessary only on R4000 / R4400 SC and MC versions
+@@ -284,6 +288,10 @@ void __init paging_init(void)
+ #endif
+ #ifdef CONFIG_ZONE_DMA
+ 	max_zone_pfns[ZONE_DMA] = MAX_DMA_PFN;
++#if defined(CONFIG_MIPS_MIKROTIK)
++//	if (mips_machgroup != MACH_GROUP_MT_RB100)
++		max_zone_pfns[ZONE_DMA] = max_low_pfn;
++#endif
+ #endif
+ #ifdef CONFIG_ZONE_DMA32
+ 	max_zone_pfns[ZONE_DMA32] = MAX_DMA32_PFN;
+Index: linux-3.18.43/arch/mips/mm/ioremap.c
+===================================================================
+--- linux-3.18.43.orig/arch/mips/mm/ioremap.c
++++ linux-3.18.43/arch/mips/mm/ioremap.c
+@@ -127,6 +127,7 @@ void __iomem * __ioremap(phys_t phys_add
+ 	if (!size || last_addr < phys_addr)
+ 		return NULL;
+ 
++#ifndef CONFIG_MAPPED_KERNEL
+ 	/*
+ 	 * Map uncached objects in the low 512mb of address space using KSEG1,
+ 	 * otherwise map using page tables.
+@@ -149,6 +150,7 @@ void __iomem * __ioremap(phys_t phys_add
+ 			if(!PageReserved(page))
+ 				return NULL;
+ 	}
++#endif
+ 
+ 	/*
+ 	 * Mappings have to be page-aligned
+Index: linux-3.18.43/arch/mips/mm/tlb-r4k.c
+===================================================================
+--- linux-3.18.43.orig/arch/mips/mm/tlb-r4k.c
++++ linux-3.18.43/arch/mips/mm/tlb-r4k.c
+@@ -474,7 +474,9 @@ static void r4k_tlb_configure(void)
+ 	 *     be set to fixed-size pages.
+ 	 */
+ 	write_c0_pagemask(PM_DEFAULT_MASK);
++#ifndef CONFIG_MAPPED_KERNEL
+ 	write_c0_wired(0);
++#endif
+ 	if (current_cpu_type() == CPU_R10000 ||
+ 	    current_cpu_type() == CPU_R12000 ||
+ 	    current_cpu_type() == CPU_R14000)
+Index: linux-3.18.43/arch/mips/rb/irq.c
+===================================================================
+--- /dev/null
++++ linux-3.18.43/arch/mips/rb/irq.c
+@@ -0,0 +1,108 @@
++#include <linux/init.h>
++#include <linux/linkage.h>
++#include <linux/irq.h>
++#include <linux/interrupt.h>
++#include <linux/bitops.h>
++#include <linux/module.h>
++#include <asm/signal.h>
++#include <asm/mipsregs.h>
++#include <asm/irq_cpu.h>
++#include <asm/bootinfo.h>
++#include <asm/vm.h>
++#include <asm/rb/boards.h>
++
++asmlinkage void plat_irq_dispatch(void) {
++	unsigned pending = read_c0_status() & read_c0_cause() & 0xfe00;
++
++	if (pending)
++		do_IRQ(fls(pending) - (9 - MIPS_CPU_IRQ_BASE));
++}
++
++volatile unsigned long virqs;
++EXPORT_SYMBOL(virqs);
++
++static void ack_virq(struct irq_data *d)
++{
++	clear_bit(d->irq - VIRQ_BASE, &virqs);
++}
++
++static inline void unmask_virq(struct irq_data *d)
++{
++}
++
++static inline void mask_virq(struct irq_data *d)
++{
++}
++
++static struct irq_chip virq_controller = {
++	.name	= "virq",
++	.irq_ack	= ack_virq,
++	.irq_unmask     = unmask_virq,
++	.irq_mask	= mask_virq,
++};
++
++static irqreturn_t virq_cascade_irq(int irq, void *dev_id)
++{
++	unsigned i;
++	unsigned irqs = virqs;
++
++	for (i = 0; irqs; ++i) {
++		if (irqs & (1 << i)) {
++			do_IRQ(i + VIRQ_BASE);
++			irqs ^= (1 << i);
++		}
++	}
++	return IRQ_HANDLED;
++}
++
++static struct irqaction virq_cascade  = {
++	.handler = virq_cascade_irq,
++	.name = "virq-cascade",
++};
++
++static void soft_irq_ack(struct irq_data *d)
++{
++	clear_c0_cause(0x100 << (d->irq - MIPS_CPU_IRQ_BASE));
++}
++
++static inline void unmask_soft_irq(struct irq_data *d)
++ {
++	set_c0_status(0x100 << (d->irq - MIPS_CPU_IRQ_BASE));
++	irq_enable_hazard();
++ }
++ 
++static inline void mask_soft_irq(struct irq_data *d)
++{
++	clear_c0_status(0x100 << (d->irq - MIPS_CPU_IRQ_BASE));
++	irq_disable_hazard();
++}
++
++static struct irq_chip soft_irq_controller = {
++	.name	= "MIPS",
++	.irq_ack	= soft_irq_ack,
++	.irq_unmask     = unmask_soft_irq,
++	.irq_mask	= mask_soft_irq,
++};
++
++extern void ont_arch_init_irq(void);
++
++void __init arch_init_irq(void)
++{
++	unsigned i;
++
++	switch (mips_machgroup) {
++	case MACH_GROUP_MT_VM:
++		mips_cpu_irq_init();
++		break;
++	}
++
++	if (mips_machgroup != MACH_GROUP_MT_RB500 &&
++	    mips_machgroup != MACH_GROUP_MT_RB100) {
++		irq_set_chip_and_handler(1, &soft_irq_controller, handle_percpu_irq);
++		setup_irq(1, &virq_cascade);
++		
++		for (i = VIRQ_BASE;  i < VIRQ_BASE + 32; ++i)
++			irq_set_chip_and_handler(i, &virq_controller,
++						 handle_edge_irq);
++	}
++}
+Index: linux-3.18.43/arch/mips/rb/Makefile
+===================================================================
+--- /dev/null
++++ linux-3.18.43/arch/mips/rb/Makefile
+@@ -0,0 +1 @@
++obj-y += prom.o platform.o irq.o
+Index: linux-3.18.43/arch/mips/rb/Platform
+===================================================================
+--- /dev/null
++++ linux-3.18.43/arch/mips/rb/Platform
+@@ -0,0 +1,13 @@
++#
++# Mikrotik RB100/RB500 boards
++#
++platform-$(CONFIG_MIPS_MIKROTIK) += rb/
++platform-$(CONFIG_MIPS_MIKROTIK) += rb/vm/
++cflags-$(CONFIG_MIPS_MIKROTIK) += -I$(srctree)/arch/mips/include/asm/mach-rb
++ifdef CONFIG_MAPPED_KERNEL
++load-$(CONFIG_MIPS_MIKROTIK) += 0xffffffffc0101000
++OBJCOPYFLAGS += --change-addresses=0xc0000000
++else
++load-$(CONFIG_MIPS_MIKROTIK) += 0xffffffff80101000
++endif
++
+Index: linux-3.18.43/arch/mips/rb/platform.c
+===================================================================
+--- /dev/null
++++ linux-3.18.43/arch/mips/rb/platform.c
+@@ -0,0 +1,18 @@
++#include <linux/platform_device.h>
++#include <linux/serial.h>
++#include <linux/serial_8250.h>
++#include <linux/spi/spi.h>
++#include <linux/mtd/partitions.h>
++#include <linux/spi/flash.h>
++#include <linux/i2c-gpio.h>
++#include <asm/bootinfo.h>
++#include <asm/rb/boards.h>
++#include <asm/rb/booter.h>
++#include <asm/serial.h>
++
++int rb_platform_init(void)
++{
++	return 0;
++}
++
++arch_initcall(rb_platform_init);
+Index: linux-3.18.43/arch/mips/rb/prom.c
+===================================================================
+--- /dev/null
++++ linux-3.18.43/arch/mips/rb/prom.c
+@@ -0,0 +1,152 @@
++#include <linux/init.h>
++#include <linux/mm.h>
++#include <linux/module.h>
++#include <linux/string.h>
++#include <linux/console.h>
++#include <asm/bootinfo.h>
++#include <asm/rb/boards.h>
++#include <linux/bootmem.h>
++#include <linux/ioport.h>
++#include <linux/ctype.h>
++#include <linux/irq.h>
++#include <linux/initrd.h>
++
++#define FREQ_TAG   "HZ="
++#define BOARD_TAG  "board="
++
++#define SR_NMI	0x00180000
++
++extern void rbvm_setup(void);
++
++extern char arcs_cmdline[COMMAND_LINE_SIZE];
++
++extern unsigned long totalram_pages;
++extern unsigned long mips_hpt_frequency;
++
++unsigned char mips_mac_address[6];
++
++unsigned long mips_machgroup __read_mostly = 0;
++EXPORT_SYMBOL(mips_machgroup);
++
++const char *get_system_type(void)
++{
++	switch (mips_machgroup) {
++	case MACH_GROUP_MT_VM:
++		return "Mikrotik VM";
++	}
++	return "unknown routerboard";
++}
++
++void __init prom_init(void)
++{
++	int argc = fw_arg0;
++	char **argv = (char **) fw_arg1;
++	unsigned char board_type[16];
++
++	unsigned i, offset = 0;
++
++	set_io_port_base(KSEG1);
++
++	memset(board_type, 0, sizeof(board_type));
++
++	/* HZ must be parsed here because otherwise is too late */
++	for (i = 0; (i < argc && argv[i] != NULL); i++) {
++		if (strncmp(argv[i], FREQ_TAG, sizeof(FREQ_TAG) - 1) == 0) {
++			mips_hpt_frequency = 
++			    simple_strtoul(argv[i] + sizeof(FREQ_TAG) - 1, 0, 10);
++			continue;
++		}
++		if (strncmp(argv[i], BOARD_TAG, sizeof(BOARD_TAG) - 1) == 0) {
++			strncpy(board_type, argv[i] + sizeof(BOARD_TAG) - 1,
++				sizeof(board_type));
++		}
++		offset += snprintf(arcs_cmdline + offset, sizeof(arcs_cmdline) - offset,
++				   "%s ", argv[i]);
++	}
++
++	mips_machgroup = MACH_GROUP_MT_VM;
++	mips_machtype = 0;
++}
++
++void __init prom_free_prom_memory(void)
++{
++	unsigned long addr, end;
++	extern char _text;
++
++	/*
++	 * Free everything below the kernel itself but leave
++	 * the first page reserved for the exception handlers.
++	 */
++
++	end = __pa(&_text);
++	addr = PAGE_SIZE;
++
++	while (addr < end) {
++		ClearPageReserved(virt_to_page(__va(addr)));
++		init_page_count(virt_to_page(__va(addr)));
++		free_page((unsigned long)__va(addr));
++		addr += PAGE_SIZE;
++		++totalram_pages;
++	}
++}
++
++void __init plat_mem_setup(void)
++{
++#ifdef CONFIG_BLK_DEV_INITRD
++	extern int _end;
++	u32 *initrd_header;
++
++	initrd_header = __va(PAGE_ALIGN(__pa_symbol(&_end) + 8)) - 8;
++	if (initrd_header[0] == 0x494E5244) {
++		initrd_start = (unsigned long) (initrd_header + 2);
++                initrd_end = initrd_start + initrd_header[1];
++	}
++#endif    
++
++	switch (mips_machgroup) {
++	case MACH_GROUP_MT_VM:
++		rbvm_setup();
++		break;
++	}
++}
++
++void __init plat_time_init(void)
++{
++}
++
++static int __init setup_kmac(char *s)
++{
++	int i, j;
++	unsigned char result, value;
++
++	for (i = 0; i < 6; i++) {
++		if (s[0] == '\0' || s[1] == '\0') return 0;
++		if (i != 5 && s[2] != ':') return 0;
++
++		result = 0;
++		for (j = 0; j < 2; j++) {
++			if (!isxdigit(*s)) return 0;
++
++			value = isdigit(*s) ? *s - '0' :
++				toupper(*s) - 'A' + 10;
++			if (value >= 16) return 0;
++
++			result = result * 16 + value;
++                        s++;
++                }
++
++                s++;
++                mips_mac_address[i] = result;
++        }
++
++        return *s == '\0';
++}
++
++__setup("kmac=", setup_kmac);
++
++EXPORT_SYMBOL(mips_mac_address);
++
++unsigned long long sched_clock(void)
++{
++	return read_c0_count() * 1000000000 / mips_hpt_frequency;
++}
+Index: linux-3.18.43/arch/mips/rb/vm/Makefile
+===================================================================
+--- /dev/null
++++ linux-3.18.43/arch/mips/rb/vm/Makefile
+@@ -0,0 +1 @@
++obj-y	 := setup.o
+Index: linux-3.18.43/arch/mips/rb/vm/setup.c
+===================================================================
+--- /dev/null
++++ linux-3.18.43/arch/mips/rb/vm/setup.c
+@@ -0,0 +1,142 @@
++#include <linux/interrupt.h>
++#include <linux/sched.h>
++#include <asm/reboot.h>
++#include <asm/vm.h>
++#include <asm/rb/boards.h>
++
++#define BUF_SIZE	256
++#define BUF_COUNT	4
++
++hypercall(vm_create_queue, 4, unsigned id, unsigned irq,
++		 unsigned tx, unsigned rx);
++hypercall(vm_release_queue, 5, unsigned id);
++hypercall(vm_running, 6, void);
++hypercall(vm_setup_irqs, 14, unsigned *irqs, unsigned count);
++
++static volatile struct vdma_descr tx_chain[BUF_COUNT];
++static volatile struct vdma_descr rx_chain[BUF_COUNT];
++static unsigned char tx_buffers[BUF_COUNT][BUF_SIZE];
++static unsigned char rx_buffers[BUF_COUNT][BUF_SIZE];
++
++static unsigned cur_tx;
++static unsigned cur_rx;
++
++static int send_message(const unsigned char *buf, int len)
++{
++	unsigned long flags;
++
++	local_irq_save(flags);
++
++	/* drop some data if full buffer */
++	while (tx_chain[cur_tx].size & DONE)
++		asm volatile ("wait");
++
++	len = min_t(int, len, BUF_SIZE);
++	memcpy(tx_buffers[cur_tx], buf, len);
++	tx_chain[cur_tx].size = len | DONE;
++
++	cur_tx = (cur_tx + 1) % BUF_COUNT;
++
++	local_irq_restore(flags);
++
++	return len;
++}
++
++static int recv_message(char *buf, int len)
++{
++	unsigned long flags;
++
++	local_irq_save(flags);
++
++	if (!(rx_chain[cur_rx].size & DONE)) {
++		local_irq_restore(flags);
++		return 0;
++	}
++	
++	len = min_t(int, len, rx_chain[cur_rx].size & ~DONE);
++	memcpy(buf, rx_buffers[cur_rx], len);
++
++	rx_chain[cur_rx].size = BUF_SIZE;
++	cur_rx = (cur_rx + 1) % BUF_COUNT;
++
++	local_irq_restore(flags);
++
++	return len;
++}
++
++static irqreturn_t ctrl_interrupt(int irq, void *dev_id)
++{
++	struct task_struct *init;
++	char buf[256];
++	int len;
++
++	len = recv_message(buf, sizeof(buf));
++	if (len <= 0)
++		return IRQ_HANDLED;
++
++	if (strncmp(buf, "restart", len) == 0) {
++		printk("RESTART\n");
++		init = find_task_by_pid_ns(1, &init_pid_ns);
++		if (init)
++			send_sig(SIGINT, init, 1);
++	} else if (strncmp(buf, "halt", len) == 0) {
++	    printk("HALT\n");
++		init = find_task_by_pid_ns(1, &init_pid_ns);
++		if (init)
++			send_sig(SIGWINCH, init, 1);
++	}
++
++	return IRQ_HANDLED;
++}
++
++static void rbvm_machine_restart(char *command)
++{
++	char msg[] = "restart";
++
++	send_message(msg, sizeof(msg));
++}
++
++static void rbvm_machine_halt(void)
++{
++	char msg[] = "halt";
++
++	send_message(msg, sizeof(msg));
++}
++
++void __init rbvm_setup(void)
++{
++	extern unsigned long virqs;
++	int i;
++
++	vm_setup_irqs((unsigned *) &virqs, 32);
++
++	for (i = 0; i < BUF_COUNT; ++i) {
++		rx_chain[i].addr = (unsigned) rx_buffers[i];
++		rx_chain[i].size = BUF_SIZE;
++		rx_chain[i].next = (unsigned) &rx_chain[i + 1];
++		
++		tx_chain[i].addr = (unsigned) tx_buffers[i];
++		tx_chain[i].size = 0;
++		tx_chain[i].next = (unsigned) &tx_chain[i + 1];
++	}
++	rx_chain[BUF_COUNT - 1].next = (unsigned) &rx_chain[0];
++	tx_chain[BUF_COUNT - 1].next = (unsigned) &tx_chain[0];
++
++	vm_create_queue(0, 0, (unsigned) &tx_chain[0],
++			(unsigned) &rx_chain[0]);
++
++	_machine_restart = rbvm_machine_restart;
++	_machine_halt = rbvm_machine_halt;
++}
++
++int __init init_ctrl_interrupt(void)
++{
++	if (mips_machgroup != MACH_GROUP_MT_VM)
++		return 0;
++
++	if (request_irq(VIRQ_BASE + 0, ctrl_interrupt, 0, "ctrl", (void *) 1))
++		return -EBUSY;
++	return 0;
++
++}
++arch_initcall(init_ctrl_interrupt);
+Index: linux-3.18.43/drivers/block/loop.c
+===================================================================
+--- linux-3.18.43.orig/drivers/block/loop.c
++++ linux-3.18.43/drivers/block/loop.c
+@@ -373,6 +373,9 @@ do_lo_receive(struct loop_device *lo,
+ 	struct file *file;
+ 	ssize_t retval;
+ 
++	pgoff_t index;
++	pgoff_t last_index;
++
+ 	cookie.lo = lo;
+ 	cookie.page = bvec->bv_page;
+ 	cookie.offset = bvec->bv_offset;
+@@ -387,6 +390,11 @@ do_lo_receive(struct loop_device *lo,
+ 	file = lo->lo_backing_file;
+ 	retval = splice_direct_to_actor(file, &sd, lo_direct_splice_actor);
+ 
++	/* HACK: try to free up page cache from tripple buffers */
++	index = pos >> PAGE_CACHE_SHIFT;
++	last_index = (pos + bsize + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
++	invalidate_mapping_pages(file->f_mapping, index, last_index);
++
+ 	return retval;
+ }
